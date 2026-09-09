@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+:root {
+  /* ─── ROLEWISE Color Palette ─────────────────── */
+  --rw-bg: #f5f5f5;
+  --rw-surface: #ffffff;
+  --rw-surface-alt: #fafafa;
+  --rw-sidebar-bg: #f8f8f8;
+  --rw-ink: #1a1a1a;
+  --rw-ink-secondary: #6b7280;
+  --rw-ink-muted: #9ca3af;
+  --rw-border: #e5e7eb;
+  --rw-border-light: #f0f0f0;
+  --rw-accent: #1a1a1a;
+  --rw-accent-hover: #374151;
+  --rw-green: #22c55e;
+  --rw-green-soft: #dcfce7;
+  --rw-green-border: #bbf7d0;
+  --rw-yellow: #f59e0b;
+  --rw-yellow-soft: #fef9e7;
+  --rw-yellow-border: #fde68a;
+  --rw-red: #ef4444;
+  --rw-red-soft: #fee2e2;
+  --rw-blue: #3b82f6;
+  --rw-blue-soft: #dbeafe;
+  --rw-purple: #8b5cf6;
+
+  /* Legacy tokens for backward compat */
+  --paper: var(--rw-bg);
+  --ink: var(--rw-ink);
+  --ink-soft: var(--rw-ink-secondary);
+  --line: var(--rw-border);
+  --copper: #b85c38;
+  --copper-dark: #8f3f24;
+  --moss: #2f4a3c;
+  --chip: var(--rw-surface-alt);
+
+  /* ─── Layout ─────────────────── */
+  --sidebar-w: 260px;
+  --right-panel-w: 300px;
+  --topbar-h: 60px;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-copper: var(--copper);
+  --color-copper-dark: var(--copper-dark);
+  --color-moss: var(--moss);
+  --color-chip: var(--chip);
+  --color-rw-bg: var(--rw-bg);
+  --color-rw-surface: var(--rw-surface);
+  --color-rw-surface-alt: var(--rw-surface-alt);
+  --color-rw-sidebar-bg: var(--rw-sidebar-bg);
+  --color-rw-ink: var(--rw-ink);
+  --color-rw-ink-secondary: var(--rw-ink-secondary);
+  --color-rw-ink-muted: var(--rw-ink-muted);
+  --color-rw-border: var(--rw-border);
+  --color-rw-border-light: var(--rw-border-light);
+  --color-rw-green: var(--rw-green);
+  --color-rw-green-soft: var(--rw-green-soft);
+  --color-rw-green-border: var(--rw-green-border);
+  --color-rw-yellow: var(--rw-yellow);
+  --color-rw-yellow-soft: var(--rw-yellow-soft);
+  --color-rw-yellow-border: var(--rw-yellow-border);
+  --color-rw-red: var(--rw-red);
+  --color-rw-red-soft: var(--rw-red-soft);
+  --color-rw-blue: var(--rw-blue);
+  --color-rw-blue-soft: var(--rw-blue-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-instrument);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--rw-border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--rw-bg);
+  color: var(--rw-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+/* ─── Scrollbar ─────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rw-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rw-ink-muted);
+}
+
+/* ─── Method Badges ─────────────── */
+.method-get {
+  background: var(--rw-blue-soft);
+  color: var(--rw-blue);
+}
+
+.method-post {
+  background: var(--rw-green-soft);
+  color: #16a34a;
+}
+
+.method-put {
+  background: var(--rw-yellow-soft);
+  color: #d97706;
+}
+
+.method-delete {
+  background: var(--rw-red-soft);
+  color: var(--rw-red);
+}
+
+.method-patch {
+  background: #f3e8ff;
+  color: var(--rw-purple);
+}
