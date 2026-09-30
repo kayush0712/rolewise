@@ -3,6 +3,7 @@ import type { RoleSlug } from "@/content/types";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { QuestionBreakdownClient } from "@/components/question-breakdown";
 
 type Props = {
   params: Promise<{ role: string; slug: string }>;
@@ -17,13 +18,46 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function QuestionPage({ params }: Props) {
   const { role: roleSlug, slug } = await params;
   const role = await getRole(roleSlug);
-  const question = await getQuestion(slug);
+  const question = await getQuestion(slug, roleSlug);
   if (!role || !question || !question.roles.includes(role.slug as RoleSlug)) {
     notFound();
   }
 
   const levelNote = question.levelBar[role.slug as RoleSlug];
 
+  // If this question has a full breakdown, render the rich interactive view
+  if (question.breakdown) {
+    const clientQuestion = {
+      slug: question.slug,
+      title: question.title,
+      track: question.track,
+      summary: question.prompt,
+      difficulty: question.difficulty,
+      roles: question.roles ?? [],
+      timeboxMinutes: question.timeboxMinutes,
+      prompt: question.prompt,
+      outline: question.outline,
+      levelBar: question.levelBar,
+      sources: question.sources,
+      breakdown: {
+        sections: question.breakdown.sections.map((s) => ({
+          id: s.id,
+          stepNumber: s.stepNumber,
+          label: s.label,
+          title: s.title,
+          blocks: s.blocks as any[],
+        })),
+        focusAreas: question.breakdown.focusAreas,
+        targetRole: question.breakdown.targetRole,
+        totalSections: question.breakdown.totalSections,
+        completedSections: question.breakdown.completedSections,
+      },
+    };
+
+    return <QuestionBreakdownClient question={clientQuestion as any} />;
+  }
+
+  // Fallback: outline-only view for questions without breakdowns
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <Link href={`/roles/${role.slug}/${question.track}`} className="text-sm text-copper">

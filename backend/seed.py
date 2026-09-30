@@ -16,7 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env.example"))
 
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/rolewise")
+MONGODB_URI = os.getenv("MONGODB_URI")
 
 
 # ─── Roles Data ───────────────────────────────────────
