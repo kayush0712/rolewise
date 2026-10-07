@@ -17,14 +17,10 @@ def _serialize(doc: dict) -> dict:
     return doc
 
 
-@router.get("")
-async def list_questions(
-    track: str | None = Query(None),
-    role: str | None = Query(None),
-    difficulty: str | None = Query(None),
-    status: str = Query("published"),
-):
-    """List all questions, filterable by track, role, difficulty, status."""
+from async_lru import alru_cache
+
+@alru_cache(maxsize=128)
+async def _cached_list_questions(track: str | None, role: str | None, difficulty: str | None, status: str):
     db = get_db()
     query: dict = {"status": status}
     if track:
@@ -35,17 +31,26 @@ async def list_questions(
         query["versions.role"] = role
 
     cursor = db.questions.find(query, {"versions.breakdown": 0})  # Exclude heavy breakdowns in list
-    docs = [_serialize(doc) async for doc in cursor]
-    return docs
+    return [_serialize(doc) async for doc in cursor]
 
 
-@router.get("/{slug}")
-async def get_question(slug: str, role: str | None = Query(None)):
-    """Get a question by slug. If role is specified, return only that role's version."""
+@router.get("")
+async def list_questions(
+    track: str | None = Query(None),
+    role: str | None = Query(None),
+    difficulty: str | None = Query(None),
+    status: str = Query("published"),
+):
+    """List all questions, filterable by track, role, difficulty, status."""
+    return await _cached_list_questions(track, role, difficulty, status)
+
+
+@alru_cache(maxsize=128)
+async def _cached_get_question(slug: str, role: str | None):
     db = get_db()
     doc = await db.questions.find_one({"slug": slug})
     if not doc:
-        raise HTTPException(status_code=404, detail="Question not found")
+        return None
 
     doc = _serialize(doc)
 
@@ -57,17 +62,34 @@ async def get_question(slug: str, role: str | None = Query(None)):
     return doc
 
 
-@router.get("/{slug}/versions/{role}")
-async def get_question_version(slug: str, role: str):
-    """Get a specific role version of a question."""
+@router.get("/{slug}")
+async def get_question(slug: str, role: str | None = Query(None)):
+    """Get a question by slug. If role is specified, return only that role's version."""
+    doc = await _cached_get_question(slug, role)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return doc
+
+
+@alru_cache(maxsize=128)
+async def _cached_get_question_version(slug: str, role: str):
     db = get_db()
     doc = await db.questions.find_one(
         {"slug": slug, "versions.role": role},
         {"versions.$": 1, "slug": 1, "title": 1, "track": 1, "difficulty": 1, "prompt": 1, "outline": 1},
     )
     if not doc:
-        raise HTTPException(status_code=404, detail="Question or version not found")
+        return None
     return _serialize(doc)
+
+
+@router.get("/{slug}/versions/{role}")
+async def get_question_version(slug: str, role: str):
+    """Get a specific role version of a question."""
+    doc = await _cached_get_question_version(slug, role)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Question or version not found")
+    return doc
 
 
 @router.post("")
@@ -86,6 +108,10 @@ async def create_question(body: dict):
     body.setdefault("versions", [])
 
     result = await db.questions.insert_one(body)
+    
+    # Invalidate cache
+    _cached_list_questions.cache_clear()
+    
     return {"_id": str(result.inserted_id), "slug": body["slug"]}
 
 
@@ -100,6 +126,12 @@ async def update_question(slug: str, body: dict):
     result = await db.questions.update_one({"slug": slug}, {"$set": body})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Question not found")
+        
+    # Invalidate cache
+    _cached_list_questions.cache_clear()
+    _cached_get_question.cache_clear()
+    _cached_get_question_version.cache_clear()
+    
     return {"updated": True}
 
 
@@ -125,4 +157,10 @@ async def add_question_version(slug: str, version: dict):
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Question not found")
+        
+    # Invalidate cache
+    _cached_list_questions.cache_clear()
+    _cached_get_question.cache_clear()
+    _cached_get_question_version.cache_clear()
+    
     return {"updated": True, "role": role}

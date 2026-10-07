@@ -21,6 +21,31 @@ async def connect_db() -> AsyncIOMotorDatabase:
     # Extract DB name from URI, default to 'rolewise'
     db_name = uri.rsplit("/", 1)[-1].split("?")[0] or "rolewise"
     _db = _client[db_name]
+
+    # Create indexes for performance
+    try:
+        # Questions collection
+        await _db.questions.create_index("slug", unique=True)
+        # Compound index for list queries
+        await _db.questions.create_index([
+            ("status", 1), 
+            ("track", 1), 
+            ("difficulty", 1), 
+            ("versions.role", 1)
+        ])
+
+        # User progress collection
+        await _db.user_progress.create_index([
+            ("userId", 1), 
+            ("questionSlug", 1)
+        ], unique=True)
+        
+        # Agent drafts
+        await _db.agent_drafts.create_index("slug", unique=True)
+        await _db.agent_drafts.create_index("status")
+    except Exception as e:
+        print(f"Warning: Failed to create indexes: {e}")
+
     return _db
 
 

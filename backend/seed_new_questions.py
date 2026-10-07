@@ -31,6 +31,7 @@ RATE_LIMITER_BREAKDOWN = {
                 {"type": "text", "content": "This is a 'small surface area, deep water' problem — the API is trivial (allow(key) → bool), which is exactly why it's a good L7 filter: candidates who stay at the algorithm level (token bucket vs sliding window) top out at L5. The hidden challenges are distributed-systems ones wearing a disguise."},
                 {"type": "callout", "variant": "warning", "title": "What the Interviewer Really Wants", "content": "A strong L7 candidate will proactively raise the tension between strict correctness (never let a single request slip past the limit) and availability/latency (a rate limiter sitting in the hot path cannot itself add meaningful tail latency, and must fail open or closed predictably)."},
                 {"type": "text", "content": "Likely probe areas: hot-key behavior for a single viral API key or IP, cross-region/global limit enforcement, the exactly-once-adjacent problem of atomic check-and-increment under concurrency, and graceful degradation when the counter store is unreachable."},
+                {"type": "callout", "variant": "info", "title": "Modern Landscape (2024+)", "content": "Know the spectrum: Envoy proxy rate-limit filters (infrastructure layer), eBPF/XDP kernel-level packet dropping (network layer), application-level middleware (code layer), and service-mesh sidecar enforcement (platform layer). A Staff answer explains where each layer is appropriate and why a platform-wide limiter-as-a-service complements rather than replaces per-service middleware."},
             ],
         },
         {
@@ -52,6 +53,8 @@ RATE_LIMITER_BREAKDOWN = {
                      "Throughput: 2M decisions/sec sustained, 5M burst",
                      "Correctness: no more than ~1-2% over-admission during races, 0% under-admission",
                      "Config propagation: <5s from write to global enforcement",
+                     "Observability: per-key decision metrics (allow/deny rate, latency histogram), per-shard health, config-version lag",
+                     "Graceful degradation: local approximate limiting within 100ms of counter-store failure detection",
                  ]},
                 {"type": "callout", "variant": "info", "title": "Stated Assumptions", "content": "Platform-wide limiter-as-a-service fronting hundreds of downstream APIs. Limits are composable (per-API-key AND per-IP). Config is hot-reloadable. Fail-open on counter-store outage with a local fallback limiter. Slight over-admission during network partitions is acceptable. Global (cross-region) limits needed for a subset of premium keys."},
             ],
@@ -66,6 +69,7 @@ RATE_LIMITER_BREAKDOWN = {
                 {"type": "text", "content": "Distinct active keys: ~50M API keys + ~200M active IPs in any 5-min window → ~250M active counter entries. Per-entry state (token bucket): ~100B/entry. Total hot-state memory: ~25 GB raw — budget ~100-150 GB across a Redis Cluster with replication."},
                 {"type": "text", "content": "Network: 4M ops/sec × ~150B request/response ≈ ~1.2 GB/s aggregate to the counter tier — this is the real scaling constraint, not CPU or memory."},
                 {"type": "callout", "variant": "definition", "title": "System Profile", "content": "Extremely write-heavy (every request is a read-modify-write), latency-critical, memory-resident, network-throughput-bound. Not storage-heavy, not compute-heavy."},
+                {"type": "callout", "variant": "info", "title": "Cost Modeling", "content": "Redis Cluster: ~15 r6g.2xlarge instances (64GB, 10Gbps) across 3 AZs ≈ $18K/mo. Decision Service: ~40 c6g.xlarge (stateless, CPU-bound on Lua serialization) ≈ $7K/mo. Total infrastructure cost: ~$30K/mo at scale — the unit economics question is whether the per-request cost ($0.0000005) justifies centralized enforcement vs per-service middleware."},
             ],
         },
         {
@@ -138,6 +142,8 @@ RATE_LIMITER_BREAKDOWN = {
                 {"type": "text", "content": "The single most important design fact: Redis executes Lua scripts single-threadedly and atomically per shard. This eliminates the TOCTOU race where two Decision Service instances both read tokens=1, both decide to allow, both write tokens=0 — one request that should have been denied was admitted."},
                 {"type": "callout", "variant": "definition", "title": "Token Bucket Lua Script", "content": "The Lua script performs: (1) read current tokens and last_refill timestamp, (2) refill based on elapsed time, (3) check if tokens >= cost, (4) deduct if allowed — all in one atomic round trip. Each key also gets a PEXPIRE TTL of (capacity / refill_rate) × 2, so idle keys self-expire."},
                 {"type": "callout", "variant": "warning", "title": "Hot-Key Failure Case", "content": "At 200K req/s on a single viral API key, every request hashes to the same Redis shard. That shard's single-threaded event loop saturates, and unrelated tenants sharing that shard see latency spikes. The fix: split the key into N sub-keys across different shards, each holding capacity/N tokens, trading precision for throughput."},
+                {"type": "callout", "variant": "info", "title": "Alternative: CRDTs for Counters", "content": "A PN-Counter (positive-negative CRDT) can replace the Lua script approach for eventually-consistent scenarios. Each node maintains its own increment counter; the global count is the sum of all replicas. Trade-off: eliminates the single-shard bottleneck entirely, but the global view is delayed by replication lag — making it suitable only for soft limits where 5-10% temporary over-admission is acceptable."},
+                {"type": "text", "content": "Testing strategy: (1) Chaos injection — kill random Redis shards during load and verify fail-open triggers within 100ms. (2) Clock-skew simulation — artificially drift NTP on Decision Service nodes and verify token refill correctness. (3) Hot-key load test — generate 500K req/s to a single key and verify sub-key splitting activates and latency stays under p99 budget."},
             ],
         },
         {
@@ -159,9 +165,10 @@ RATE_LIMITER_BREAKDOWN = {
             "title": "Staff-Level Summary",
             "blocks": [
                 {"type": "text", "content": "Key architectural decisions: (1) Single-round-trip atomic Lua script as the concurrency-control primitive, eliminating the check-then-write race. (2) Key-hash-based sharding (never time-based), with dynamic sub-key sharding for hot keys. (3) Asymmetric redistribution rule for cross-region global limits."},
-                {"type": "text", "content": "Biggest tradeoffs: Fail-open with local approximate fallback trades strict correctness for availability. Global limits are eventually-consistent by design."},
+                {"type": "text", "content": "Biggest tradeoffs: Fail-open with local approximate fallback trades strict correctness for availability. Global limits are eventually-consistent by design. CRDT-based counters offer a middle ground for soft limits but sacrifice precision."},
                 {"type": "text", "content": "Biggest risks: Hot-key detection is reactive-by-sampling unless proactively built. The idempotency decision_id mechanism is easy to hand-wave; without it, client retry storms silently double-consume quota."},
-                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would address how this becomes a platform primitive other teams build on, how the hot-key detector's signal could be shared with a broader abuse-prevention system, and which specific business risk each tradeoff protects against."},
+                {"type": "callout", "variant": "warning", "title": "Observability of the Limiter Itself", "content": "The rate limiter is a protection mechanism — if it fails silently, the blast radius is the entire platform. Instrument: (1) allow/deny ratio per tenant (anomaly = config error), (2) counter-store latency histogram (p50/p99/p999), (3) fallback-mode activation rate, (4) config-version lag across nodes, (5) hot-key detector trigger rate. Expose via OpenTelemetry metrics → Prometheus, with PagerDuty alerts on fallback-mode > 1% of decisions."},
+                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would address: (1) How this becomes a platform primitive other teams build on — SDK design, SLA contracts, and self-serve configuration UI. (2) How the hot-key detector's signal feeds a broader abuse-prevention system (shared with WAF, fraud detection). (3) Cost attribution — per-tenant metering of limiter infrastructure cost. (4) Migration strategy — how you roll this out to 200 existing services without a flag day."},
             ],
         },
     ],
@@ -185,6 +192,7 @@ CICD_BREAKDOWN = {
                 {"type": "text", "content": "This is a workflow-orchestration-under-multi-tenancy problem, structurally close to Temporal/Airflow but with a hard real-time UX layer (live logs, live status) bolted on."},
                 {"type": "callout", "variant": "warning", "title": "Hidden Challenges", "content": "The 'obvious' design (queue + workers + Postgres) breaks in three distinct ways: (a) noisy-neighbor starvation, (b) at-least-once execution corrupting non-idempotent build steps (e.g. terraform apply, npm publish), and (c) unbounded log storage cost. A Staff engineer anticipates all three before writing code."},
                 {"type": "text", "content": "Likely probes: how do you keep one tenant's 10,000-job monorepo from starving everyone else, how do you guarantee a step doesn't run twice, how do you stream logs from an ephemeral pod, how do you replay/rerun from a mid-pipeline failure without redoing everything."},
+                {"type": "callout", "variant": "info", "title": "Modern Landscape (2024+)", "content": "Supply chain security is now a first-class interview topic. Be ready to discuss: SLSA framework (Supply-chain Levels for Software Artifacts), SBOM generation (CycloneDX/SPDX), Sigstore/cosign for artifact signing, ephemeral credentials (OIDC federation to cloud providers instead of long-lived secrets), and hermetic builds (reproducible, network-isolated build environments). A Staff candidate who only designs the orchestration layer without mentioning build integrity will get probed."},
             ],
         },
         {
@@ -201,6 +209,8 @@ CICD_BREAKDOWN = {
                      "Stream logs live and persist them durably",
                      "Guarantee each step executes with at-most-once effect even under worker crash",
                      "Artifact passing between steps (build output → deploy step)",
+                     "Build cache: content-addressable layer caching shared across tenant builds",
+                     "Secret injection: short-lived, scoped credentials injected at runtime (never persisted to disk)",
                  ],
                  "nonFunctional": [
                      "Step scheduling latency: p50 <5s, p99 <30s",
@@ -209,6 +219,7 @@ CICD_BREAKDOWN = {
                      "Availability (control plane): 99.95%",
                      "Fairness: max wait-time skew bounded by weighted-fair-share",
                      "Log/artifact durability: 99.999%",
+                     "Security: tenant-isolated build environments, no cross-tenant cache poisoning, SLSA Level 3 provenance",
                  ]},
                 {"type": "callout", "variant": "info", "title": "Stated Assumptions", "content": "Multi-tenant SaaS, hosted ephemeral runners (containers), live log streaming required, pipelines defined as YAML DAGs with a mix of idempotent and non-idempotent steps, hard per-tenant concurrency quotas, forked-PR builds run in a stronger sandbox. Scale: 50M pipeline runs/day."},
             ],
@@ -222,7 +233,8 @@ CICD_BREAKDOWN = {
                 {"type": "text", "content": "Pipeline runs: 50M/day → ~580/sec average, peak (~6x) ≈ 3,500 runs/sec. Steps per run: avg 15 → ~52,000 steps/sec at peak. Step duration: avg 90s → ~4.7M concurrent containers at peak (platform-wide, sharded across regions/cells)."},
                 {"type": "text", "content": "Log volume: avg step emits 50KB logs → 2.6 GB/sec log ingest at peak, ~37.5 TB/day before compression."},
                 {"type": "text", "content": "Metadata: 50M runs × 15 steps × ~1KB × 3 writes/step = ~2.25B row writes/day ≈ 150K/sec peak."},
-                {"type": "callout", "variant": "definition", "title": "System Profile", "content": "Write-heavy on metadata (state transitions), throughput-heavy on logs (blob storage, not a database problem), and scheduling-heavy on the control plane (packing problem, not a storage problem)."},
+                {"type": "text", "content": "Build cache: avg build produces ~2GB of cacheable layers. With dedup (content-addressable), effective new data per build drops to ~200MB. Cache storage: 50M builds × 200MB / 10x dedup = ~1PB/year. Cache hit rate target: >70% (industry benchmark: GitHub Actions ~75%)."},
+                {"type": "callout", "variant": "definition", "title": "System Profile", "content": "Write-heavy on metadata (state transitions), throughput-heavy on logs (blob storage, not a database problem), scheduling-heavy on the control plane (packing problem, not a storage problem), and cache-heavy on the build layer (content-addressable dedup, not a compute problem)."},
             ],
         },
         {
@@ -234,12 +246,13 @@ CICD_BREAKDOWN = {
                 {"type": "entity-table", "entities": [
                     {"name": "Pipeline", "purpose": "YAML-defined DAG template, versioned per commit. Belongs to a Repo/Tenant"},
                     {"name": "Run", "purpose": "One execution instance of a Pipeline, triggered by an event (queued/running/succeeded/failed/cancelled)"},
-                    {"name": "Step", "purpose": "One node in the DAG for a given Run. Has dependencies, status, assigned Runner, retry count"},
-                    {"name": "StepAttempt", "purpose": "One execution attempt of a Step (retries/crash-recovery). Maps to a container"},
-                    {"name": "Runner", "purpose": "Ephemeral compute unit (container/VM) that executes exactly one StepAttempt at a time"},
-                    {"name": "Tenant", "purpose": "Owns Pipelines, has a compute quota and scheduling weight"},
-                    {"name": "Artifact", "purpose": "Blob produced by a Step, referenced by downstream Steps via content hash"},
+                    {"name": "Step", "purpose": "One node in the DAG for a given Run. Has dependencies, status, assigned Runner, retry count, is_idempotent flag"},
+                    {"name": "StepAttempt", "purpose": "One execution attempt of a Step (retries/crash-recovery). Maps to a container. Carries lease_token and provenance metadata"},
+                    {"name": "Runner", "purpose": "Ephemeral compute unit (container/VM) that executes exactly one StepAttempt at a time. Destroyed after use (no state leakage)"},
+                    {"name": "Tenant", "purpose": "Owns Pipelines, has a compute quota, scheduling weight, and security boundary"},
+                    {"name": "Artifact", "purpose": "Blob produced by a Step, referenced by downstream Steps via content hash. Signed with SLSA provenance attestation"},
                     {"name": "LogChunk", "purpose": "Ordered chunk of log output for a StepAttempt, streamed and persisted"},
+                    {"name": "BuildCacheEntry", "purpose": "Content-addressable cache layer keyed by (step_definition_hash, input_hash). Scoped per-tenant to prevent cache poisoning"},
                 ]},
             ],
         },
@@ -292,6 +305,7 @@ CICD_BREAKDOWN = {
                 {"type": "comparison", "title": "Scheduler Architecture", "optionA": {"label": "Central scheduler", "description": "Single decision-maker, simple"}, "optionB": {"label": "Sharded/cell-based schedulers", "description": "Per region+tenant-band, bounded blast radius"}, "recommendation": "Cell-based", "rationale": "A single scheduler at 4.7M concurrent containers is a throughput and blast-radius risk."},
                 {"type": "comparison", "title": "Fairness Mechanism", "optionA": {"label": "FIFO global queue", "description": "Simple, first-come first-served"}, "optionB": {"label": "Weighted fair queuing per tenant", "description": "Computed at dequeue time"}, "recommendation": "Weighted fair queuing", "rationale": "FIFO lets one large monorepo's burst starve small tenants — directly violates the fairness NFR."},
                 {"type": "comparison", "title": "Log Storage", "optionA": {"label": "Write logs to Postgres", "description": "Co-locate with state DB"}, "optionB": {"label": "Kafka → blob storage (S3)", "description": "Separate hot and cold paths"}, "recommendation": "Kafka → S3", "rationale": "Logs are 50x the write volume of metadata. Co-locating them with transactional state would tank state-store performance."},
+                {"type": "comparison", "title": "Build Cache Scope", "optionA": {"label": "Shared global cache", "description": "Maximum hit rate, any tenant benefits from any build"}, "optionB": {"label": "Per-tenant isolated cache", "description": "No cross-tenant cache poisoning attack surface"}, "recommendation": "Per-tenant isolated", "rationale": "A poisoned cache entry (malicious dependency substitution) in a shared cache would propagate to every tenant. The hit-rate loss (~5-10%) is an acceptable security trade-off."},
             ],
         },
         {
@@ -324,9 +338,10 @@ CICD_BREAKDOWN = {
             "label": "SUMMARY",
             "title": "Staff-Level Summary",
             "blocks": [
-                {"type": "text", "content": "Key decisions: at-least-once execution + CAS-guarded leases; hash-partitioned per-tenant scheduling with WFQ; complete decoupling of log-ingest from DAG state machine; split retry behavior on step idempotency."},
+                {"type": "text", "content": "Key decisions: at-least-once execution + CAS-guarded leases; hash-partitioned per-tenant scheduling with WFQ; complete decoupling of log-ingest from DAG state machine; split retry behavior on step idempotency; per-tenant isolated build cache."},
                 {"type": "text", "content": "Biggest risks: The non-idempotent-step lease-expiry path is the highest-consequence failure mode. Getting the is_idempotent classification wrong reintroduces the exact double-execution risk the entire lease design exists to prevent."},
-                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would address: how to roll out a scheduler fairness-algorithm change across a fleet running 4.7M concurrent containers without a flag-day cutover, how to migrate the step_attempts schema on a live table at 150K writes/sec without downtime, and how to design the tenant-facing SLA for the 'non-idempotent step failed with unknown outcome' case."},
+                {"type": "callout", "variant": "warning", "title": "Supply Chain Security Considerations", "content": "A modern CI/CD platform must address: (1) Build provenance — SLSA Level 3 requires hermetic, reproducible builds with signed attestation. (2) Dependency integrity — lock files verified against known-good checksums, not re-resolved at build time. (3) Secret zero problem — how does the runner authenticate to inject secrets without a bootstrap secret? Answer: OIDC federation — the platform issues a short-lived JWT, the cloud provider trusts it via federated identity. (4) Forked-PR sandbox — builds from external forks must not access production secrets or the tenant's cache."},
+                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would address: (1) How to roll out a scheduler fairness-algorithm change across a fleet running 4.7M concurrent containers without a flag-day cutover. (2) How to migrate the step_attempts schema on a live table at 150K writes/sec without downtime (online DDL + dual-write). (3) How to design the tenant-facing SLA for the 'non-idempotent step failed with unknown outcome' case. (4) Build cache economics — per-tenant cost attribution and tiered eviction policies."},
             ],
         },
     ],
@@ -338,7 +353,7 @@ CICD_BREAKDOWN = {
 OBSERVABILITY_BREAKDOWN = {
     "focusAreas": ["Time-Series Data", "Distributed Tracing", "Multi-Tenancy", "Cardinality Management"],
     "targetRole": "Staff Engineer",
-    "totalSections": 10,
+    "totalSections": 11,
     "completedSections": 0,
     "sections": [
         {
@@ -350,6 +365,7 @@ OBSERVABILITY_BREAKDOWN = {
                 {"type": "text", "content": "This is a multi-workload data-platform problem — the candidate must design metrics ingestion, distributed tracing, and alerting as three coupled but distinctly-shaped subsystems under one multi-tenant umbrella."},
                 {"type": "callout", "variant": "warning", "title": "Why This Is a Good L7 Problem", "content": "There's no single 'right' datastore. Naive candidates reach for 'just use Cassandra for everything' and miss that metrics cardinality explosion, trace-assembly ordering, and alert-evaluation latency each demand different tradeoffs."},
                 {"type": "text", "content": "Hidden challenges: tag cardinality explosion (a single bad tag like user_id can create billions of unique series), out-of-order/late-arriving data, and the alerting correctness/latency tradeoff (false negatives are worse than false positives). Likely probes: cardinality control, hot partition handling, tail-based trace sampling, alert engine watermarking."},
+                {"type": "callout", "variant": "info", "title": "Modern Landscape (2024+)", "content": "OpenTelemetry (OTel) is now the de-facto standard for instrumentation. A Staff answer should mention: (1) OTel Collector as the vendor-neutral ingestion layer (replaces proprietary agents). (2) OTLP protocol for metrics, traces, and logs. (3) eBPF-based auto-instrumentation (zero-code, kernel-level tracing) for languages where manual instrumentation is impractical. (4) Exemplars — linking a specific metric data point to the trace that caused it, bridging the metrics→traces correlation gap."},
             ],
         },
         {
@@ -372,6 +388,8 @@ OBSERVABILITY_BREAKDOWN = {
                      "Cardinality isolation: per-tenant quota enforced at ingestion",
                      "Storage cost: automatic downsampling (raw 15d, 5-min rollup 13mo)",
                      "Trace sampling: 100% of error/slow traces kept even while sampling 99% of normal traffic",
+                     "Correlation: exemplar links from metrics to traces, service maps auto-generated from trace data",
+                     "Protocol compatibility: OTLP, Prometheus remote-write, StatsD, Jaeger/Zipkin span formats",
                  ]},
                 {"type": "callout", "variant": "info", "title": "Scope", "content": "B2B SaaS, ~50,000 customer organizations. Scope: Metrics (time series) + Distributed Tracing (APM) + Alerting. Logs are explicitly out of scope (different cost/storage profile, would double the interview)."},
             ],
@@ -457,6 +475,7 @@ OBSERVABILITY_BREAKDOWN = {
                 {"type": "comparison", "title": "Cardinality Control", "optionA": {"label": "Allow unlimited tags", "description": "Maximum flexibility for users"}, "optionB": {"label": "Per-tenant cardinality quota at ingestion", "description": "Enforce limits before bad data enters the system"}, "recommendation": "Per-tenant quota", "rationale": "Unbounded cardinality is the #1 real-world outage cause in TSDBs — a single bad tag can 100x series count."},
                 {"type": "comparison", "title": "Trace Sampling", "optionA": {"label": "Head-based", "description": "Decide at span-start"}, "optionB": {"label": "Tail-based", "description": "Decide after trace completes"}, "recommendation": "Tail-based", "rationale": "Head-based can't guarantee 100% capture of error/slow traces since you don't know the outcome yet."},
                 {"type": "comparison", "title": "Rollup Strategy", "optionA": {"label": "Compute aggregates at read time", "description": "Simpler write path"}, "optionB": {"label": "Precompute rollups on write", "description": "5-min and 1-hr rollups, query raw only for short windows"}, "recommendation": "Precompute rollups", "rationale": "Read-time aggregation over 13 months of raw 10s data is infeasible; rollups trade storage for query latency."},
+                {"type": "comparison", "title": "Ingestion Protocol", "optionA": {"label": "Proprietary agent + protocol", "description": "Full control, optimized for your platform"}, "optionB": {"label": "OpenTelemetry Collector + OTLP", "description": "Vendor-neutral, community-maintained, broad ecosystem"}, "recommendation": "OTLP with proprietary extensions", "rationale": "OTel is the industry standard (CNCF graduated). Accept OTLP natively, but support a thin proprietary extension layer for features like exemplar correlation and custom sampling directives. Avoids vendor lock-in for customers while preserving differentiation."},
             ],
         },
         {
@@ -481,18 +500,33 @@ OBSERVABILITY_BREAKDOWN = {
                 {"type": "callout", "variant": "warning", "title": "Late-Span / Split-Decision Race", "content": "A service on a partitioned network sends its error span 12s after trace start — past the 10s watermark. The assembler already discarded spans A/B/C based on a 'no error seen' sampling decision. The error trace is lost entirely — the exact failure the NFR says must never happen."},
                 {"type": "callout", "variant": "definition", "title": "Fix: Tombstone Grace Period + Dynamic Watermark", "content": "On 'discard' decision, keep a lightweight tombstone for 60s. A late error span triggers a partial re-open. Additionally, set the watermark dynamically per-org based on observed p99 span latency, rather than a global 10s constant — orgs with flaky networks need a longer watermark."},
                 {"type": "text", "content": "Under 10x/100x load, the binding constraint shifts to memory — buffering more concurrent in-flight traces per shard. Fix: spill trace_buffer to local SSD (RocksDB) and shard across more assembler nodes. The correctness problem (late spans) exists at any scale."},
+                {"type": "callout", "variant": "info", "title": "Exemplar Correlation", "content": "When a metric point is ingested (e.g., http_request_duration_seconds = 4.2s), attach an exemplar containing the trace_id of the request that produced it. This lets a dashboard user click on a latency spike in a chart and jump directly to the offending trace — the single most valuable debugging workflow in modern observability. Storage cost: ~16 bytes per exemplar (trace_id only), sampled at ~1/100 points."},
+            ],
+        },
+        {
+            "id": "deep-dive-3",
+            "stepNumber": 10,
+            "label": "DEEP DIVE",
+            "title": "Alert Engine: Watermarks, Flapping, and Correctness",
+            "blocks": [
+                {"type": "text", "content": "The Alert Evaluator consumes from Kafka and maintains a streaming aggregation per alert rule. Each rule defines a PromQL-like query (e.g., 'avg(cpu_usage) by (host) > 90% for 5m'). The evaluator must decide: is this alert firing, resolved, or still pending?"},
+                {"type": "callout", "variant": "warning", "title": "The Watermark Problem", "content": "Metrics arrive out of order. If the evaluator sees {t=10:01, value=95%} and {t=10:03, value=92%} but hasn't yet received t=10:02, it cannot finalize the 10:00-10:05 window. Premature evaluation causes false alerts; waiting too long violates the 60s SLA. The fix: a per-org watermark tracking the minimum timestamp guaranteed to have been received. The evaluator fires provisionally on incomplete windows and issues a correction if late data changes the outcome."},
+                {"type": "callout", "variant": "definition", "title": "Alert State Machine (CAS-Protected)", "content": "States: OK → PENDING → FIRING → RESOLVED. Transitions are CAS-guarded: UPDATE alert_state SET status='FIRING', version=version+1 WHERE rule_id=? AND version=?. This prevents two evaluator replicas from both transitioning the same rule and sending duplicate notifications. The PENDING state absorbs transient spikes — the 'for 5m' clause means the condition must hold for the full duration before FIRING."},
+                {"type": "callout", "variant": "warning", "title": "Flapping Suppression", "content": "A metric oscillating around the threshold (89%, 91%, 88%, 92%) would fire and resolve every evaluation cycle, flooding the on-call engineer. Fix: hysteresis — fire at >90% but only resolve at <85%. This 5% dead-band absorbs noise. Additionally, group related alerts (same service, same time window) into a single notification with a 30s grouping delay."},
+                {"type": "text", "content": "At 1M active rules and 20K evaluations/sec, the evaluator fleet must be sharded by rule_id (consistent hashing). Rule reassignment on evaluator scale-up/down uses a protocol similar to Kafka consumer group rebalancing — drain in-flight windows before releasing a rule to avoid split-brain alerts."},
             ],
         },
         {
             "id": "summary",
-            "stepNumber": 10,
+            "stepNumber": 11,
             "label": "SUMMARY",
             "title": "Staff-Level Summary",
             "blocks": [
-                {"type": "text", "content": "Key decisions: (1) Wide-column TSDB with (org_id, series_id, time_bucket) partitioning to bound partition size and rotate hot replicas. (2) Tail-based trace sampling via consistent-hash assembler shards with tunable watermark. (3) Alert state machine with CAS-based transitions and watermark-gated window finalization."},
-                {"type": "text", "content": "Biggest tradeoffs: Rollup precomputation trades write amplification for read latency. The alert evaluator's fast-path/watermark-correction split trades a small rate of 'corrected' notifications for meeting the 60s SLA."},
+                {"type": "text", "content": "Key decisions: (1) Wide-column TSDB with (org_id, series_id, time_bucket) partitioning to bound partition size and rotate hot replicas. (2) Tail-based trace sampling via consistent-hash assembler shards with tunable watermark and exemplar correlation. (3) Alert state machine with CAS-based transitions, watermark-gated window finalization, and hysteresis-based flapping suppression."},
+                {"type": "text", "content": "Biggest tradeoffs: Rollup precomputation trades write amplification for read latency. The alert evaluator's provisional-then-corrected pattern trades a small rate of 'corrected' notifications for meeting the 60s SLA. OTLP compatibility trades some protocol optimization for vendor-neutrality."},
                 {"type": "text", "content": "Biggest risks: Cardinality quota enforcement is the single most load-bearing mechanism — too strict and customers lose data; too loose and one tenant takes down shared infrastructure. The trace assembler's late-span race is a genuine unsolved-in-full correctness gap."},
-                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would reason about cross-region replication for the TSDB itself, the org-level cost-modeling feedback loop between pricing and cardinality quotas, and a migration strategy for evolving the partition key scheme on a live system serving 30M points/sec."},
+                {"type": "callout", "variant": "warning", "title": "Cost Modeling", "content": "At scale, storage dominates: ~6 TB/day metrics (after compression) + ~13 TB/day traces = ~7 PB/year. With S3 tiering (hot/warm/cold): ~$150K/mo storage, ~$80K/mo compute (writers + assemblers + evaluators), ~$40K/mo Kafka. Total: ~$270K/mo. The per-org unit cost ($5.40/mo) must justify the pricing tier. Cardinality-based pricing (not host-based) aligns incentives: customers pay for the complexity they create, not the infrastructure they happen to run on."},
+                {"type": "callout", "variant": "info", "title": "Path to Principal", "content": "A Principal-level answer would reason about: (1) Cross-region replication for the TSDB itself — active-active vs active-passive, query routing during failover. (2) The org-level cost-modeling feedback loop between pricing and cardinality quotas. (3) A migration strategy for evolving the partition key scheme on a live system serving 30M points/sec (dual-write + backfill). (4) How to unify metrics, traces, and logs into a single correlation experience without building a monolithic store."},
             ],
         },
     ],
@@ -605,17 +639,19 @@ async def seed_new_questions():
     skipped = 0
 
     for q in NEW_QUESTIONS:
-        existing = await db.questions.find_one({"slug": q["slug"]})
-        if existing:
-            print(f"⊘ '{q['slug']}' already exists, skipping")
-            skipped += 1
-            continue
-
-        q["createdAt"] = now
         q["updatedAt"] = now
-        await db.questions.insert_one(q)
-        print(f"✓ Inserted '{q['slug']}' ({q['title']})")
-        inserted += 1
+        # Upsert based on slug
+        result = await db.questions.update_one(
+            {"slug": q["slug"]},
+            {"$set": q, "$setOnInsert": {"createdAt": now}},
+            upsert=True
+        )
+        if result.upserted_id:
+            print(f"✓ Inserted '{q['slug']}' ({q['title']})")
+            inserted += 1
+        else:
+            print(f"✓ Updated '{q['slug']}' ({q['title']})")
+            inserted += 1
 
     client.close()
     print(f"\n✅ Done! Inserted {inserted}, skipped {skipped}.")

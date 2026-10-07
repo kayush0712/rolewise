@@ -1,7 +1,33 @@
 import { SearchIcon, RefreshIcon, BellIcon } from "./icons";
 import { SignInButton, Show, UserButton } from "@clerk/nextjs";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import { RoleSelector } from "./role-selector";
 
-export function TopBar() {
+export async function TopBar() {
+  const { userId } = await auth();
+  
+  let targetRoleDisplay = "Select Target Role";
+  let currentRoleDisplay = "Select Current Role";
+  
+  if (userId) {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const targetRole = user.publicMetadata?.targetRole as string;
+    const currentRole = user.publicMetadata?.currentRole as string;
+    
+    if (targetRole === "sde_2") targetRoleDisplay = "Mid-Level (SDE II)";
+    else if (targetRole === "sde_3") targetRoleDisplay = "Senior (SDE III)";
+    else if (targetRole === "staff") targetRoleDisplay = "Staff";
+    else if (targetRole === "principal") targetRoleDisplay = "Principal+";
+    else if (user.publicMetadata?.onboardingComplete) targetRoleDisplay = "Role Set";
+
+    if (currentRole === "student") currentRoleDisplay = "Student / New Grad";
+    else if (currentRole === "sde_1") currentRoleDisplay = "Junior (SDE I)";
+    else if (currentRole === "sde_2") currentRoleDisplay = "Mid-Level (SDE II)";
+    else if (currentRole === "sde_3") currentRoleDisplay = "Senior (SDE III)";
+    else if (currentRole === "staff") currentRoleDisplay = "Staff / Principal";
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between border-b border-rw-border bg-rw-surface px-6">
       {/* Center: Search */}
@@ -25,21 +51,14 @@ export function TopBar() {
 
       {/* Right: Role selector, refresh, bell, avatar */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded-full border border-rw-border px-4 py-2 text-sm">
-          <span className="h-2 w-2 rounded-full bg-rw-green" />
-          <span className="font-medium text-rw-ink">Senior Software Engineer</span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-rw-ink-muted"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </div>
+        {userId ? (
+          <RoleSelector currentRole={currentRoleDisplay} targetRole={targetRoleDisplay} />
+        ) : (
+          <div className="flex items-center gap-2 rounded-full border border-rw-border px-4 py-2 text-sm transition-colors cursor-not-allowed opacity-50">
+            <span className="h-2 w-2 rounded-full bg-rw-ink-muted" />
+            <span className="font-medium text-rw-ink-muted">Sign In Required</span>
+          </div>
+        )}
         <button className="rounded-lg p-2 text-rw-ink-secondary hover:bg-rw-bg">
           <RefreshIcon width={16} height={16} />
         </button>

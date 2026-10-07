@@ -6,3 +6,4 @@ anthropic>=0.52
 pydantic>=2.10
 python-dotenv>=1.0
 httpx>=0.28
+async-lru>=2.0.4
