@@ -136,3 +136,64 @@ a {
   background: #f3e8ff;
   color: var(--rw-purple);
 }
+
+/* ─── Whimsy Injector ─────────────────── */
+
+/* Delightful Button Interactions */
+.btn-whimsy {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.btn-whimsy::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+.btn-whimsy:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+.btn-whimsy:hover::before {
+  left: 100%;
+}
+.btn-whimsy:active {
+  transform: translateY(-1px) scale(1.01);
+}
+
+/* Easter Egg Trigger */
+.easter-egg-zone {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.easter-egg-zone:hover {
+  background: linear-gradient(45deg, #dcfce7 0%, #dbeafe 50%, #f3e8ff 100%);
+  background-size: 400% 400%;
+  animation: gradient 3s ease infinite;
+  border-color: transparent;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-whimsy,
+  .btn-whimsy::before,
+  .easter-egg-zone,
+  .easter-egg-zone:hover {
+    animation: none;
+    transition: none;
+  }
+  .btn-whimsy:hover,
+  .btn-whimsy:active {
+    transform: none;
+  }
+}

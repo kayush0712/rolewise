@@ -1,4 +1,5 @@
 import { SearchIcon, RefreshIcon, BellIcon } from "./icons";
+import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 
 export function TopBar() {
   return (
@@ -45,9 +46,22 @@ export function TopBar() {
         <button className="rounded-lg p-2 text-rw-ink-secondary hover:bg-rw-bg">
           <BellIcon width={16} height={16} />
         </button>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-rw-ink text-xs font-bold text-white">
-          JS
-        </div>
+        
+        {/* Clerk Auth UI */}
+        <Show when="signed-out">
+          <div className="ml-2">
+            <SignInButton mode="modal">
+              <button className="rounded-lg bg-rw-ink px-4 py-2 text-sm font-medium text-white hover:bg-rw-ink-secondary transition-colors btn-whimsy">
+                Sign In
+              </button>
+            </SignInButton>
+          </div>
+        </Show>
+        <Show when="signed-in">
+          <div className="ml-2 h-9 w-9">
+            <UserButton appearance={{ elements: { avatarBox: "h-9 w-9" } }} />
+          </div>
+        </Show>
       </div>
     </header>
   );
