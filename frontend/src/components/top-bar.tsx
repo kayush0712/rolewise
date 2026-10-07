@@ -2,7 +2,7 @@ import { SearchIcon, RefreshIcon, BellIcon } from "./icons";
 
 export function TopBar() {
   return (
-    <header className="sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between border-b border-rw-border bg-rw-surface/95 px-6 backdrop-blur-sm">
+    <header className="sticky top-0 z-30 flex h-[var(--topbar-h)] items-center justify-between border-b border-rw-border bg-rw-surface px-6">
       {/* Center: Search */}
       <div className="flex flex-1 justify-center">
         <div className="relative w-full max-w-md">

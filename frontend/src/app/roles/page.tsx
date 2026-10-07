@@ -16,7 +16,7 @@ export default async function RolesPage() {
         Mix of coding, LLD, HLD, and behavioral shifts as you go up. Start at the
         level on the job description, not the one you wish they asked.
       </p>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {roles.map((role) => (
           <RoleCard key={role.slug} role={role} />
         ))}

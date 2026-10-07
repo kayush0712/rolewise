@@ -32,7 +32,7 @@ const navSections = [
   {
     label: "PRACTICE",
     items: [
-      { href: "/roles", label: "Questions", icon: ZapIcon },
+      { href: "/roles", label: "Roles", icon: ZapIcon },
       { href: "/mock", label: "Mock Interviews", icon: MicIcon },
     ],
   },
@@ -49,7 +49,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-full w-[var(--sidebar-w)] flex-col border-r border-rw-border bg-rw-surface">
+    <aside className="fixed left-0 top-0 z-40 hidden md:flex h-full w-[var(--sidebar-w)] flex-col border-r border-rw-border bg-rw-surface">
       {/* Logo */}
       <div className="px-5 pb-2 pt-5">
         <Link href="/" className="text-lg font-bold tracking-tight text-rw-ink">
@@ -57,13 +57,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      {/* Sidebar Search */}
-      <div className="px-4 pb-3 pt-2">
-        <div className="flex items-center gap-2 rounded-lg border border-rw-border bg-rw-surface-alt px-3 py-2 text-sm text-rw-ink-muted">
-          <SearchIcon width={15} height={15} />
-          <span>Search...</span>
-        </div>
-      </div>
+      {/* Sidebar Search removed (moved to top bar) */}
 
       {/* Nav Sections */}
       <nav className="flex-1 overflow-y-auto px-3 pb-4">

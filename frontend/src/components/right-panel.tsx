@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import { CheckSquareIcon, SquareIcon } from "./icons";
 
 type InterviewStep = {
@@ -32,6 +35,9 @@ export function RightPanel({
   targetRole?: string;
   focusAreas?: string[];
 }) {
+  const pathname = usePathname();
+  if (pathname === "/roles") return null;
+
   return (
     <aside className="fixed right-0 top-[var(--topbar-h)] z-20 hidden h-[calc(100vh-var(--topbar-h))] w-[var(--right-panel-w)] overflow-y-auto border-l border-rw-border bg-rw-surface p-5 xl:block">
       {/* Interview Plan */}

@@ -15,14 +15,14 @@ export function AppShell({
       <Sidebar />
 
       {/* Main area (offset by sidebar) */}
-      <div className="ml-[var(--sidebar-w)] flex flex-1 flex-col">
+      <div className="md:ml-[var(--sidebar-w)] flex flex-1 flex-col min-w-0">
         {/* Top bar */}
         <TopBar />
 
         {/* Content + optional right panel */}
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-w-0">
           <main
-            className={`flex-1 overflow-y-auto p-8 ${
+            className={`flex-1 overflow-y-auto overflow-x-auto p-8 min-w-0 ${
               showRightPanel ? "xl:mr-[var(--right-panel-w)]" : ""
             }`}
           >
