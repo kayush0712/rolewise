@@ -51,7 +51,7 @@ export function OnboardingClient() {
         <div className="flex gap-2 items-center">
           {steps.map((s) => (
             <div key={s.id} className="flex items-center gap-2">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${step === s.id ? "bg-rw-ink text-white shadow-md scale-110" : step > s.id ? "bg-rw-green text-white" : "bg-rw-surface-alt text-rw-ink-muted border border-rw-border"}`}>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${step === s.id ? "bg-rw-ink text-rw-bg shadow-md scale-110" : step > s.id ? "bg-rw-green text-white" : "bg-rw-surface-alt text-rw-ink-muted border border-rw-border"}`}>
                 {step > s.id ? "✓" : s.id}
               </div>
               {s.id !== 3 && <ChevronRight className={`w-4 h-4 ${step > s.id ? "text-rw-green" : "text-rw-border"}`} />}
@@ -197,7 +197,7 @@ export function OnboardingClient() {
               (step === 2 && !targetRole) ||
               (step === 3 && (!timeline || isSubmitting))
             }
-            className="group relative flex items-center gap-2 bg-rw-ink text-white px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed transition-all overflow-hidden"
+            className="group relative flex items-center gap-2 bg-rw-ink text-rw-bg px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed transition-all overflow-hidden"
           >
             {/* Shimmer effect */}
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />

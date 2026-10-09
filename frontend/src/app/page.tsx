@@ -23,7 +23,7 @@ export default async function Home() {
         <div className="mt-10 flex flex-col gap-4 sm:flex-row">
           <Link
             href="/roles"
-            className="btn-whimsy rounded-lg bg-rw-ink px-8 py-3.5 text-base font-bold text-white shadow-lg"
+            className="btn-whimsy rounded-lg bg-rw-ink px-8 py-3.5 text-base font-bold text-rw-bg shadow-lg"
           >
             Start Practicing for Free
           </Link>
@@ -137,7 +137,7 @@ export default async function Home() {
               <div className="absolute inset-0 flex items-center justify-center bg-rw-surface/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
                 <Link
                   href={`/questions/${q.slug}`}
-                  className="btn-whimsy rounded-full bg-rw-ink px-6 py-2.5 text-sm font-bold text-white shadow-lg"
+                  className="btn-whimsy rounded-full bg-rw-ink px-6 py-2.5 text-sm font-bold text-rw-bg shadow-lg"
                 >
                   Unlock Breakdown 🔓
                 </Link>
@@ -148,10 +148,10 @@ export default async function Home() {
                   <span
                     className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${
                       q.difficulty === "foundation"
-                        ? "border-green-200 bg-green-50 text-green-700"
+                        ? "border-rw-green-border bg-rw-green-soft text-rw-green"
                         : q.difficulty === "core"
-                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                        : "border-red-200 bg-red-50 text-red-700"
+                        ? "border-rw-yellow-border bg-rw-yellow-soft text-rw-yellow"
+                        : "border-transparent bg-rw-red-soft text-rw-red"
                     }`}
                   >
                     {q.difficulty === "foundation"

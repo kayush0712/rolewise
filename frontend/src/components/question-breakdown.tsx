@@ -118,7 +118,7 @@ export function QuestionBreakdownClient({ question }: { question: Question }) {
 
         {/* CTA buttons */}
         <div className="mt-6 flex gap-3">
-          <button className="rounded-lg bg-rw-ink px-6 py-2.5 text-sm font-medium text-white hover:bg-rw-accent-hover">
+          <button className="rounded-lg bg-rw-ink px-6 py-2.5 text-sm font-medium text-rw-bg hover:opacity-90">
             Start Practice
           </button>
           <button className="rounded-lg border border-rw-border px-6 py-2.5 text-sm font-medium text-rw-ink hover:bg-rw-surface-alt">

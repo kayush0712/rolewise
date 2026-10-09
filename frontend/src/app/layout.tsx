@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,15 +30,18 @@ export const metadata: Metadata = {
     "Role-wise interview prep for SDE 1 through Principal — coding, LLD, HLD, and behavioral, with structured problem breakdowns and a trend analyzer.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} ${instrument.variable} h-full antialiased`}
+        suppressHydrationWarning
       >
         <body className="flex min-h-full flex-col bg-rw-bg text-rw-ink overflow-x-hidden">
-          <AppShell>{children}</AppShell>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <AppShell>{children}</AppShell>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

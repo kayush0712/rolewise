@@ -1,28 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  /* ─── ROLEWISE Color Palette ─────────────────── */
-  --rw-bg: #f5f5f5;
-  --rw-surface: #ffffff;
-  --rw-surface-alt: #fafafa;
-  --rw-sidebar-bg: #f8f8f8;
-  --rw-ink: #1a1a1a;
-  --rw-ink-secondary: #6b7280;
-  --rw-ink-muted: #9ca3af;
-  --rw-border: #e5e7eb;
-  --rw-border-light: #f0f0f0;
-  --rw-accent: #1a1a1a;
-  --rw-accent-hover: #374151;
+  /* ─── ROLEWISE Color Palette (Light - Ivory/Navy) ─────────────────── */
+  --rw-bg: #E8E0D2;             /* Ivory */
+  --rw-surface: #F2ECE1;        /* Lighter Ivory */
+  --rw-surface-alt: #DFD6C4;    /* Darker Ivory */
+  --rw-sidebar-bg: #E8E0D2;
+  --rw-ink: #0E1D61;            /* Deep Atlas Navy */
+  --rw-ink-secondary: #24347A;
+  --rw-ink-muted: #4B5A9C;
+  --rw-border: #D1C7B1;
+  --rw-border-light: #DFD6C4;
+  --rw-accent: #B89A5A;         /* Gold */
+  --rw-accent-hover: #9C824C;   /* Darker Gold */
+  
+  /* Semantic Colors (adjusted to blend with Ivory/Navy) */
   --rw-green: #22c55e;
-  --rw-green-soft: #dcfce7;
-  --rw-green-border: #bbf7d0;
+  --rw-green-soft: rgba(34, 197, 94, 0.1);
+  --rw-green-border: rgba(34, 197, 94, 0.3);
   --rw-yellow: #f59e0b;
-  --rw-yellow-soft: #fef9e7;
-  --rw-yellow-border: #fde68a;
+  --rw-yellow-soft: rgba(245, 158, 11, 0.1);
+  --rw-yellow-border: rgba(245, 158, 11, 0.3);
   --rw-red: #ef4444;
-  --rw-red-soft: #fee2e2;
+  --rw-red-soft: rgba(239, 68, 68, 0.1);
   --rw-blue: #3b82f6;
-  --rw-blue-soft: #dbeafe;
+  --rw-blue-soft: rgba(59, 130, 246, 0.1);
   --rw-purple: #8b5cf6;
 
   /* Legacy tokens for backward compat */
@@ -30,15 +32,37 @@
   --ink: var(--rw-ink);
   --ink-soft: var(--rw-ink-secondary);
   --line: var(--rw-border);
-  --copper: #b85c38;
-  --copper-dark: #8f3f24;
-  --moss: #2f4a3c;
+  --copper: var(--rw-accent);
+  --copper-dark: var(--rw-accent-hover);
+  --moss: var(--rw-ink);
   --chip: var(--rw-surface-alt);
 
   /* ─── Layout ─────────────────── */
   --sidebar-w: 260px;
   --right-panel-w: 300px;
   --topbar-h: 60px;
+}
+
+.dark {
+  /* ─── ROLEWISE Color Palette (Dark - Slate/Charcoal) ─────────────────── */
+  --rw-bg: #1A1D24;             /* Dark Slate Background */
+  --rw-surface: #252B35;        /* Lighter Slate Surface */
+  --rw-surface-alt: #2C333F;    /* Even Lighter Slate */
+  --rw-sidebar-bg: #1A1D24;
+  --rw-ink: #E4E7EB;            /* Crisp Cool White */
+  --rw-ink-secondary: #9BA3B0;  /* Muted Slate Text */
+  --rw-ink-muted: #6B7280;
+  --rw-border: #3A4150;         /* Subtle Slate Border */
+  --rw-border-light: #2C333F;
+  --rw-accent: #B89A5A;         /* Gold */
+  --rw-accent-hover: #D1B474;   /* Lighter Gold */
+  
+  --rw-green: #38A89D;          /* Teal Green from Reference */
+  --rw-green-soft: rgba(56, 168, 157, 0.15);
+  --rw-green-border: rgba(56, 168, 157, 0.3);
+  --rw-yellow-soft: rgba(245, 158, 11, 0.15);
+  --rw-red-soft: rgba(239, 68, 68, 0.15);
+  --rw-blue-soft: rgba(59, 130, 246, 0.15);
 }
 
 @theme inline {
@@ -59,6 +83,8 @@
   --color-rw-ink-muted: var(--rw-ink-muted);
   --color-rw-border: var(--rw-border);
   --color-rw-border-light: var(--rw-border-light);
+  --color-rw-accent: var(--rw-accent);
+  --color-rw-accent-hover: var(--rw-accent-hover);
   --color-rw-green: var(--rw-green);
   --color-rw-green-soft: var(--rw-green-soft);
   --color-rw-green-border: var(--rw-green-border);

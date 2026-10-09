@@ -21,13 +21,13 @@ export function StepTabs({
             onClick={() => onSelect(section.id)}
             className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
               isActive
-                ? "border-rw-ink bg-rw-ink text-white"
+                ? "border-rw-ink bg-rw-ink text-rw-bg"
                 : "border-rw-border bg-rw-surface text-rw-ink-secondary hover:border-rw-ink-muted hover:text-rw-ink"
             }`}
           >
             <span
               className={`font-mono text-xs ${
-                isActive ? "text-white/70" : "text-rw-ink-muted"
+                isActive ? "text-rw-bg/70" : "text-rw-ink-muted"
               }`}
             >
               {String(section.stepNumber).padStart(2, "0")}

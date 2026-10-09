@@ -2,6 +2,7 @@ import { SearchIcon, RefreshIcon, BellIcon } from "./icons";
 import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { RoleSelector } from "./role-selector";
+import { ThemeToggle } from "./theme-toggle";
 
 export async function TopBar() {
   const { userId } = await auth();
@@ -59,6 +60,7 @@ export async function TopBar() {
             <span className="font-medium text-rw-ink-muted">Sign In Required</span>
           </div>
         )}
+        <ThemeToggle />
         <button className="rounded-lg p-2 text-rw-ink-secondary hover:bg-rw-bg">
           <RefreshIcon width={16} height={16} />
         </button>
@@ -70,7 +72,7 @@ export async function TopBar() {
         <Show when="signed-out">
           <div className="ml-2">
             <SignInButton mode="modal">
-              <button className="rounded-lg bg-rw-ink px-4 py-2 text-sm font-medium text-white hover:bg-rw-ink-secondary transition-colors btn-whimsy">
+              <button className="rounded-lg bg-rw-ink px-4 py-2 text-sm font-medium text-rw-bg hover:bg-rw-ink-secondary transition-colors btn-whimsy">
                 Sign In
               </button>
             </SignInButton>
